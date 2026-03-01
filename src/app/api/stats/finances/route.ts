@@ -10,20 +10,20 @@ export async function GET() {
       WHERE DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', CURRENT_DATE)
     `);
 
-        // 2. Business Expenses (Paid)
+        // 2. Business Expenses (Paid) - Use paid_date when expense is marked paid
         const bizResult = await query(`
       SELECT COALESCE(SUM(amount), 0) as total 
       FROM expenses 
       WHERE category = 'BUSINESS' AND is_paid = TRUE
-      AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+      AND DATE_TRUNC('month', COALESCE(paid_date::timestamp with time zone, created_at)) = DATE_TRUNC('month', CURRENT_DATE)
     `);
 
-        // 3. Personal Expenses (Paid)
+        // 3. Personal Expenses (Paid) - Use paid_date when expense is marked paid
         const personalResult = await query(`
       SELECT COALESCE(SUM(amount), 0) as total 
       FROM expenses 
       WHERE category = 'PERSONAL' AND is_paid = TRUE
-      AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+      AND DATE_TRUNC('month', COALESCE(paid_date::timestamp with time zone, created_at)) = DATE_TRUNC('month', CURRENT_DATE)
     `);
 
         // 4. Pending Expenses (Not paid)

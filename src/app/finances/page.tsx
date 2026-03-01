@@ -163,8 +163,9 @@ export default function FinancesPage() {
             const currentYear = now.getFullYear();
 
             const monthExpenses = Array.isArray(allExpenses) ? allExpenses.filter((e: any) => {
-                const date = new Date(e.due_date);
-                return date.getMonth() === currentMonth && date.getFullYear() === currentYear && e.is_paid;
+                // Use paid_date for paid expenses, due_date for unpaid
+                const dateToCheck = e.is_paid && e.paid_date ? new Date(e.paid_date) : new Date(e.due_date);
+                return dateToCheck.getMonth() === currentMonth && dateToCheck.getFullYear() === currentYear && e.is_paid;
             }) : [];
 
             const monthIncome = Array.isArray(allPayments) ? allPayments.filter((p: any) => {
