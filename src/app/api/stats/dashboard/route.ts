@@ -15,7 +15,7 @@ export async function GET() {
       SELECT COALESCE(SUM(amount), 0) as total 
       FROM expenses 
       WHERE is_paid = TRUE 
-      AND DATE_TRUNC('month', COALESCE(paid_date::timestamp with time zone, created_at)) = DATE_TRUNC('month', CURRENT_DATE)
+      AND TO_CHAR(COALESCE(paid_date, created_at::date), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
     `);
 
         // 3. Client Debt (Total account receivable)
