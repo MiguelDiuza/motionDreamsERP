@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import Modal from '@/components/ui/Modal';
 import NumericInput from '@/components/ui/NumericInput';
@@ -40,6 +40,8 @@ export default function FinancesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [activeTab, setActiveTab] = useState<'ALL' | 'BUSINESS' | 'PERSONAL' | 'RECURRING'>('ALL');
+    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const lastUpdateRef = useRef<number>(0);
 
     const [newExpense, setNewExpense] = useState({
         description: '',
@@ -49,16 +51,27 @@ export default function FinancesPage() {
         is_recurring: false
     });
 
-    const fetchFinances = async () => {
+    const fetchFinances = async (skipLoading: boolean = false) => {
         try {
-            setIsLoading(true);
+            if (!skipLoading) {
+                setIsLoading(true);
+            }
+            
+            console.log('[FinancesPage] Fetching data...');
+            
             const [expensesRes, statsRes] = await Promise.all([
-                fetch('/api/expenses'),
-                fetch('/api/stats/finances')
+                fetch(`/api/expenses?t=${Date.now()}`),
+                fetch(`/api/stats/finances?t=${Date.now()}`)
             ]);
+
+            if (!expensesRes.ok || !statsRes.ok) {
+                throw new Error(`API error: expenses=${expensesRes.status}, stats=${statsRes.status}`);
+            }
 
             const expensesData = await expensesRes.json();
             const statsData = await statsRes.json();
+
+            console.log('[FinancesPage] Data received:', { expenses: expensesData?.length, stats: statsData });
 
             if (Array.isArray(expensesData)) {
                 setExpenses(expensesData);
@@ -69,18 +82,56 @@ export default function FinancesPage() {
 
             if (statsData && !statsData.error) {
                 setStats(statsData);
+                lastUpdateRef.current = Date.now();
+            } else if (statsData?.error) {
+                console.error('Stats API error:', statsData.error);
             }
-        } catch (error) {
-            console.error('Fetch error finances:', error);
-            setExpenses([]);
-            toast.error('Error al sincronizar finanzas');
+        } catch (error: any) {
+            console.error('[FinancesPage] Fetch error:', error);
+            toast.error(`Error al sincronizar finanzas: ${error.message}`);
         } finally {
-            setIsLoading(false);
+            if (!skipLoading) {
+                setIsLoading(false);
+            }
         }
     };
 
+    // Initial load and auto-refresh setup
     useEffect(() => {
         fetchFinances();
+
+        // Auto-refresh every 3 seconds while page is visible
+        const setupPolling = () => {
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            
+            pollIntervalRef.current = setInterval(() => {
+                console.log('[FinancesPage] Auto-refresh triggered');
+                fetchFinances(true); // Refresh sin mostrar loading
+            }, 3000);
+        };
+
+        setupPolling();
+
+        // Handle visibility changes - detener polling si pestaña está oculta
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                if (pollIntervalRef.current) {
+                    clearInterval(pollIntervalRef.current);
+                    console.log('[FinancesPage] Paused polling - tab hidden');
+                }
+            } else {
+                console.log('[FinancesPage] Resumed polling - tab visible');
+                setupPolling();
+                fetchFinances(); // Refrescar inmediatamente cuando vuelve a estar visible
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        };
     }, []);
 
     const handleCreateExpense = async () => {
@@ -100,12 +151,17 @@ export default function FinancesPage() {
             });
 
             if (res.ok) {
-                toast.success(newExpense.is_recurring ? '✅ Gasto fijo mensual creado' : 'Gasto registrado con éxito');
+                toast.success(newExpense.is_recurring ? '✅ Gasto fijo mensual creado' : '✅ Gasto registrado con éxito');
                 setIsModalOpen(false);
                 setNewExpense({ description: '', amount: '', category: 'BUSINESS', due_date: new Date().toISOString().split('T')[0], is_recurring: false });
-                fetchFinances();
+                
+                // Refrescar después de 300ms
+                setTimeout(() => {
+                    fetchFinances(false);
+                }, 300);
             }
         } catch (error) {
+            console.error('Error creating expense:', error);
             toast.error('Error al registrar gasto');
         }
     };
@@ -130,6 +186,8 @@ export default function FinancesPage() {
 
     const togglePaid = async (id: string, currentPaid: boolean) => {
         try {
+            console.log(`[togglePaid] Toggling expense ${id} from ${currentPaid} to ${!currentPaid}`);
+            
             const res = await fetch(`/api/expenses/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -137,11 +195,23 @@ export default function FinancesPage() {
             });
 
             if (res.ok) {
-                toast.success(!currentPaid ? 'Gasto marcado como PAGADO' : 'Gasto marcado como PENDIENTE');
-                fetchFinances();
+                const updatedExpense = await res.json();
+                console.log('[togglePaid] Success:', updatedExpense);
+                
+                toast.success(!currentPaid ? '✅ Gasto marcado como PAGADO' : '✅ Gasto marcado como PENDIENTE');
+                
+                // Refrescar después de 300ms para asegurar que la BD registró el cambio
+                setTimeout(() => {
+                    console.log('[togglePaid] Refreshing data after update');
+                    fetchFinances(false);
+                }, 300);
+            } else {
+                const error = await res.json();
+                throw new Error(error.error || 'Error desconocido');
             }
-        } catch (error) {
-            toast.error('Error al actualizar estado');
+        } catch (error: any) {
+            console.error('[togglePaid] Error:', error);
+            toast.error(`Error: ${error.message}`);
         }
     };
 
@@ -192,10 +262,14 @@ export default function FinancesPage() {
             try {
                 const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
                 if (res.ok) {
-                    toast.success('Gasto eliminado');
-                    fetchFinances();
+                    toast.success('✅ Gasto eliminado');
+                    // Refrescar después de 300ms
+                    setTimeout(() => {
+                        fetchFinances(false);
+                    }, 300);
                 }
             } catch (error) {
+                console.error('Error deleting expense:', error);
                 toast.error('Error al eliminar');
             }
         }

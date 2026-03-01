@@ -140,6 +140,8 @@ export default function ClientsPage() {
             if (isNaN(amount) || amount <= 0) return toast.warning('Valor inválido');
 
             try {
+                console.log('[handleSubmit] Registering payment:', { client: selectedClient.name, amount, type: modalType });
+                
                 const res = await fetch('/api/payments', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -152,13 +154,25 @@ export default function ClientsPage() {
                 });
 
                 if (res.ok) {
-                    toast.success(modalType === 'full_settlement' ? '¡Deuda liquidada con éxito!' : `Abono de $${amount.toLocaleString('es-CO')} registrado`);
+                    const payment = await res.json();
+                    console.log('[handleSubmit] Payment registered:', payment);
+                    
+                    toast.success(modalType === 'full_settlement' ? '✅ ¡Deuda liquidada con éxito!' : `✅ Abono de $${amount.toLocaleString('es-CO')} registrado`);
                     setIsModalOpen(false);
                     setInputValue('');
-                    fetchClients();
+                    
+                    // Refrescar después de 300ms para asegurar que la BD registró el cambio
+                    setTimeout(() => {
+                        console.log('[handleSubmit] Refreshing clients after payment');
+                        fetchClients();
+                    }, 300);
+                } else {
+                    const error = await res.json();
+                    throw new Error(error.error || 'Error desconocido al registrar pago');
                 }
-            } catch (error) {
-                toast.error('Error al registrar pago');
+            } catch (error: any) {
+                console.error('[handleSubmit] Error registering payment:', error);
+                toast.error(`Error: ${error.message}`);
             }
         }
     };
