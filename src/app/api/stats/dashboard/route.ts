@@ -33,13 +33,19 @@ export async function GET() {
       WHERE status = 'PENDING'
     `);
 
-        return NextResponse.json({
+        const response = {
             incomeMonth: parseFloat(incomeResult.rows[0].total),
             expensesMonth: parseFloat(expensesResult.rows[0].total),
             clientDebt: parseFloat(debtResult.rows[0].total),
             activeJobsCount: parseInt(jobsResult.rows[0].count),
             activeJobsValue: parseFloat(jobsResult.rows[0].value)
-        });
+        };
+        
+        const res = NextResponse.json(response);
+        res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.headers.set('Pragma', 'no-cache');
+        res.headers.set('Expires', '0');
+        return res;
     } catch (error) {
         console.error('Error fetching dashboard stats:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

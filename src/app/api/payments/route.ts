@@ -41,7 +41,11 @@ export async function GET(request: Request) {
         sql += ' ORDER BY p.payment_date DESC';
 
         const result = await query(sql, params);
-        return NextResponse.json(result.rows);
+        const res = NextResponse.json(result.rows);
+        res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.headers.set('Pragma', 'no-cache');
+        res.headers.set('Expires', '0');
+        return res;
     } catch (error) {
         console.error('Error fetching payments:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

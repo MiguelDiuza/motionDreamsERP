@@ -51,7 +51,12 @@ export async function GET() {
 
         console.log('[GET /api/stats/finances] Results:', response);
         
-        return NextResponse.json(response);
+        const res = NextResponse.json(response);
+        // Prevenir caché - siempre obtener datos frescos
+        res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.headers.set('Pragma', 'no-cache');
+        res.headers.set('Expires', '0');
+        return res;
     } catch (error: any) {
         console.error('[GET /api/stats/finances] Error fetching finance stats:', error);
         return NextResponse.json({ 
