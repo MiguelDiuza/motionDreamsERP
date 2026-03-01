@@ -200,11 +200,21 @@ export default function FinancesPage() {
         }
     };
 
-    const filteredExpenses = Array.isArray(expenses) ? expenses.filter(e => {
-        if (activeTab === 'RECURRING') return e.is_recurring === true;
-        if (activeTab === 'ALL') return true;
-        return e.category === activeTab;
-    }) : [];
+    const filteredExpenses = Array.isArray(expenses) ? expenses
+        .filter(e => {
+            if (activeTab === 'RECURRING') return e.is_recurring === true;
+            if (activeTab === 'ALL') return true;
+            return e.category === activeTab;
+        })
+        .sort((a, b) => {
+            // Pendientes (is_paid = false) primero, luego pagados (is_paid = true)
+            if (a.is_paid !== b.is_paid) {
+                return a.is_paid ? 1 : -1;
+            }
+            // Si ambos tienen el mismo estado de pago, ordenar por fecha
+            return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+        })
+    : [];
 
     const recurringCount = expenses.filter(e => e.is_recurring).length;
 

@@ -6,9 +6,9 @@ export async function GET() {
         // Fallback: if is_recurring column doesn't exist yet, run without it
         let result;
         try {
-            result = await query('SELECT * FROM expenses ORDER BY is_recurring DESC, due_date ASC, created_at DESC');
+            result = await query('SELECT * FROM expenses ORDER BY is_paid ASC, is_recurring DESC, due_date ASC, created_at DESC');
         } catch {
-            result = await query('SELECT * FROM expenses ORDER BY due_date ASC, created_at DESC');
+            result = await query('SELECT * FROM expenses ORDER BY is_paid ASC, due_date ASC, created_at DESC');
         }
         return NextResponse.json(result.rows);
     } catch (error) {
