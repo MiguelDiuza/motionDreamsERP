@@ -47,8 +47,8 @@ export default function Dashboard() {
         try {
             setIsLoading(true);
             const [statsRes, clientsRes] = await Promise.all([
-                fetch('/api/stats/dashboard'),
-                fetch('/api/clients')
+                fetch('/api/stats/dashboard', { cache: 'no-store' }),
+                fetch('/api/clients', { cache: 'no-store' })
             ]);
 
             const statsData = await statsRes.json();

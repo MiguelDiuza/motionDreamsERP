@@ -37,7 +37,7 @@ export default function WorkflowPage() {
     const fetchJobs = async () => {
         try {
             setIsLoading(true);
-            const res = await fetch('/api/jobs');
+            const res = await fetch('/api/jobs', { cache: 'no-store' });
             const data = await res.json();
 
             if (Array.isArray(data)) {
@@ -57,7 +57,7 @@ export default function WorkflowPage() {
 
     const fetchClients = async () => {
         try {
-            const res = await fetch('/api/clients');
+            const res = await fetch('/api/clients', { cache: 'no-store' });
             const data = await res.json();
 
             if (Array.isArray(data)) {
