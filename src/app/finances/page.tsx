@@ -30,10 +30,18 @@ export default function FinancesPage() {
     const [expenses, setExpenses] = useState<any[]>([]);
     const [stats, setStats] = useState({
         incomeMonth: 0,
+        incomeTotal: 0,
+        expensesBusinessMonth: 0,
+        expensesPersonalMonth: 0,
+        totalExpensesPaidMonth: 0,
+        realProfitMonth: 0,
+        totalExpensesPaidTotal: 0,
+        realProfitTotal: 0,
+        pendingToPay: 0,
+        // Legacy/Backward compatibility fields
         expensesBusiness: 0,
         expensesPersonal: 0,
         totalExpensesPaid: 0,
-        pendingToPay: 0,
         realProfit: 0
     });
     const [isLoading, setIsLoading] = useState(true);
@@ -56,9 +64,9 @@ export default function FinancesPage() {
             if (!skipLoading) {
                 setIsLoading(true);
             }
-            
+
             console.log('[FinancesPage] Fetching data...');
-            
+
             const [expensesRes, statsRes] = await Promise.all([
                 fetch(`/api/expenses?t=${Date.now()}`),
                 fetch(`/api/stats/finances?t=${Date.now()}`)
@@ -103,7 +111,7 @@ export default function FinancesPage() {
         // Auto-refresh every 3 seconds while page is visible
         const setupPolling = () => {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-            
+
             pollIntervalRef.current = setInterval(() => {
                 console.log('[FinancesPage] Auto-refresh triggered');
                 fetchFinances(true); // Refresh sin mostrar loading
@@ -154,7 +162,7 @@ export default function FinancesPage() {
                 toast.success(newExpense.is_recurring ? '✅ Gasto fijo mensual creado' : '✅ Gasto registrado con éxito');
                 setIsModalOpen(false);
                 setNewExpense({ description: '', amount: '', category: 'BUSINESS', due_date: new Date().toISOString().split('T')[0], is_recurring: false });
-                
+
                 // Refrescar después de 300ms
                 setTimeout(() => {
                     fetchFinances(false);
@@ -187,7 +195,7 @@ export default function FinancesPage() {
     const togglePaid = async (id: string, currentPaid: boolean) => {
         try {
             console.log(`[togglePaid] Toggling expense ${id} from ${currentPaid} to ${!currentPaid}`);
-            
+
             const res = await fetch(`/api/expenses/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -197,9 +205,9 @@ export default function FinancesPage() {
             if (res.ok) {
                 const updatedExpense = await res.json();
                 console.log('[togglePaid] Success:', updatedExpense);
-                
+
                 toast.success(!currentPaid ? '✅ Gasto marcado como PAGADO' : '✅ Gasto marcado como PENDIENTE');
-                
+
                 // Refrescar después de 300ms para asegurar que la BD registró el cambio
                 setTimeout(() => {
                     console.log('[togglePaid] Refreshing data after update');
@@ -289,7 +297,7 @@ export default function FinancesPage() {
             // Si ambos tienen el mismo estado de pago, ordenar por fecha
             return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
         })
-    : [];
+        : [];
 
     const recurringCount = expenses.filter(e => e.is_recurring).length;
 
@@ -343,31 +351,55 @@ export default function FinancesPage() {
             {/* Financial Summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 uppercase">
                 <GlassCard className="p-8 border-l-4 border-l-green-500 bg-white/5">
-                    <p className="text-[10px] font-black text-white/30 tracking-widest mb-1">Ingresos (Pagos Recibidos)</p>
-                    <p className="text-3xl font-black text-white">${stats.incomeMonth.toLocaleString('es-CO')}</p>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-[10px] font-black text-white/30 tracking-widest mb-1">Ingresos (Mes Actual)</p>
+                            <p className="text-3xl font-black text-white">${stats.incomeMonth.toLocaleString('es-CO')}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[8px] font-black text-white/20 tracking-widest mb-1">Total Acumulado</p>
+                            <p className="text-sm font-black text-green-500">${stats.incomeTotal.toLocaleString('es-CO')}</p>
+                        </div>
+                    </div>
                     <div className="mt-4 flex items-center gap-2 text-[9px] font-black text-green-500">
-                        <TrendingUp size={14} /> Dinero real en caja
+                        <TrendingUp size={14} /> Dinero real en caja este mes
                     </div>
                 </GlassCard>
 
                 <GlassCard className="p-8 border-l-4 border-l-brand-red bg-white/5">
-                    <p className="text-[10px] font-black text-white/30 tracking-widest mb-1">Egresos Totales (Pagados)</p>
-                    <p className="text-3xl font-black text-white">${stats.totalExpensesPaid.toLocaleString('es-CO')}</p>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-[10px] font-black text-white/30 tracking-widest mb-1">Egresos (Mes Actual)</p>
+                            <p className="text-3xl font-black text-white">${stats.totalExpensesPaidMonth.toLocaleString('es-CO')}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[8px] font-black text-white/20 tracking-widest mb-1">Total Acumulado</p>
+                            <p className="text-sm font-black text-brand-red">${stats.totalExpensesPaidTotal.toLocaleString('es-CO')}</p>
+                        </div>
+                    </div>
                     <div className="mt-4 flex items-center justify-between">
                         <div className="flex items-center gap-2 text-[9px] font-black text-brand-red">
-                            <TrendingDown size={14} /> Gastos ejecutados
+                            <TrendingDown size={14} /> Gastos pagados
                         </div>
                         <div className="flex gap-4">
-                            <div className="text-[8px] font-black text-white/40">BIZ: ${stats.expensesBusiness.toLocaleString('es-CO')}</div>
-                            <div className="text-[8px] font-black text-white/40">PERS: ${stats.expensesPersonal.toLocaleString('es-CO')}</div>
+                            <div className="text-[8px] font-black text-white/40">BIZ: ${stats.expensesBusinessMonth.toLocaleString('es-CO')}</div>
+                            <div className="text-[8px] font-black text-white/40">PERS: ${stats.expensesPersonalMonth.toLocaleString('es-CO')}</div>
                         </div>
                     </div>
                 </GlassCard>
 
                 <GlassCard className="p-8 border-l-4 border-l-blue-500 bg-brand-red ring-1 ring-white/10 shadow-[0_20px_40px_rgba(242,15,15,0.2)]">
-                    <p className="text-[10px] font-black text-white/50 tracking-widest mb-1">Utilidad Real Neta</p>
-                    <p className="text-3xl font-black text-white">${stats.realProfit.toLocaleString('es-CO')}</p>
-                    <p className="text-[9px] font-black text-white/30 uppercase mt-4">Ingresos - Gastos Pagados</p>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-[10px] font-black text-white/50 tracking-widest mb-1">Utilidad (Mes Actual)</p>
+                            <p className="text-3xl font-black text-white">${stats.realProfitMonth.toLocaleString('es-CO')}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[8px] font-black text-white/40 tracking-widest mb-1">Utilidad Total</p>
+                            <p className="text-sm font-black text-white">${stats.realProfitTotal.toLocaleString('es-CO')}</p>
+                        </div>
+                    </div>
+                    <p className="text-[9px] font-black text-white/30 uppercase mt-4">Ingresos - Gastos Efectivos</p>
                 </GlassCard>
             </div>
 

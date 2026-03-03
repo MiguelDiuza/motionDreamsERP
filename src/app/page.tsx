@@ -25,7 +25,9 @@ import { toast } from 'sonner';
 export default function Dashboard() {
     const [stats, setStats] = useState({
         incomeMonth: 0,
+        incomeTotal: 0,
         expensesMonth: 0,
+        expensesTotal: 0,
         clientDebt: 0,
         activeJobsCount: 0,
         activeJobsValue: 0
@@ -166,6 +168,7 @@ export default function Dashboard() {
                     icon={TrendingUp}
                     label="Ingresos (Mes)"
                     value={`$${formatCompactNumber(stats.incomeMonth)}`}
+                    subValue={`Total: $${formatCompactNumber(stats.incomeTotal)}`}
                     color="text-green-500"
                     bg="bg-green-500/10"
                 />
@@ -173,6 +176,7 @@ export default function Dashboard() {
                     icon={TrendingDown}
                     label="Egresos Pagos"
                     value={`$${formatCompactNumber(stats.expensesMonth)}`}
+                    subValue={`Total: $${formatCompactNumber(stats.expensesTotal)}`}
                     color="text-brand-red"
                     bg="bg-brand-red/10"
                 />
@@ -187,6 +191,7 @@ export default function Dashboard() {
                     icon={Zap}
                     label="Utilidad (Mes)"
                     value={`$${formatCompactNumber(stats.incomeMonth - stats.expensesMonth)}`}
+                    subValue={`Util. Total: $${formatCompactNumber(stats.incomeTotal - stats.expensesTotal)}`}
                     color="text-blue-500"
                     bg="bg-blue-500/10"
                     isMain
@@ -337,7 +342,7 @@ export default function Dashboard() {
     );
 }
 
-function StatCard({ icon: Icon, label, value, color, bg, isMain }: any) {
+function StatCard({ icon: Icon, label, value, subValue, color, bg, isMain }: any) {
     return (
         <GlassCard className={`p-8 border-none ${isMain ? 'bg-gradient-to-tr from-brand-red/20 to-transparent ring-1 ring-white/10 shadow-[0_20px_40px_rgba(242,15,15,0.1)]' : 'bg-white/5 hover:bg-white/[0.07]'} transition-all group`}>
             <div className="flex items-center justify-between mb-4">
@@ -349,6 +354,9 @@ function StatCard({ icon: Icon, label, value, color, bg, isMain }: any) {
             <div>
                 <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">{label}</p>
                 <p className={`text-2xl font-black ${isMain ? 'text-white' : 'text-white'} tracking-tight`}>{value}</p>
+                {subValue && (
+                    <p className="text-[9px] font-black text-white/20 uppercase mt-2 tracking-wider">{subValue}</p>
+                )}
             </div>
         </GlassCard>
     );
