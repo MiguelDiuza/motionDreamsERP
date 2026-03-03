@@ -32,7 +32,16 @@ interface Income {
     client_name: string;
     amount: number | string;
     payment_method: string;
+    payment_date?: string;
     created_at: string;
+}
+
+interface Payment {
+    id: string;
+    amount: number | string;
+    payment_method: string;
+    payment_date: string;
+    notes?: string;
 }
 
 /**
@@ -87,7 +96,7 @@ const getPngFromUrl = async (url: string, forceWhite: boolean = false): Promise<
 /**
  * Generates a professional PDF Account Statement for Motion Dreams.
  */
-export const generateAccountStatementPDF = async (client: any, totalBalance: number, jobs: Job[] = []) => {
+export const generateAccountStatementPDF = async (client: any, totalBalance: number, jobs: Job[] = [], payments: Payment[] = []) => {
     const doc = new jsPDF();
     const pageWidth = 210;
 
@@ -179,32 +188,52 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
     doc.setTextColor(150);
     doc.text(totalBalance > 0 ? 'SALDO PENDIENTE' : 'SIN DEUDA', pageWidth - 15, 72, { align: 'right' });
 
-    // ── Jobs Table ───────────────────────────────────────────────
-    const startY = client.company ? 82 : 78;
+    // ── Table Data Combined (Jobs + Payments) ───────────────────
+    const subtotalJobs = jobs.reduce((acc, job) => acc + parseFloat(job.price?.toString() || '0'), 0);
+    const totalPayments = payments.reduce((acc, pay) => acc + parseFloat(pay.amount?.toString() || '0'), 0);
 
-    let tableRows: any[][];
+    let tableRows: any[][] = [];
+
+    // Add Jobs
     if (jobs && jobs.length > 0) {
-        tableRows = jobs.map((job) => {
+        jobs.forEach((job) => {
             const price = parseFloat(job.price?.toString() || '0');
             const date = job.completion_date || job.due_date || job.created_at || '';
             const formattedDate = date ? new Date(date).toLocaleDateString('es-CO') : '-';
             const status = job.status === 'COMPLETED' ? '✓ Entregado' : '⏳ Pendiente';
-            return [
+            tableRows.push([
                 formattedDate,
-                job.title,
+                job.title.toUpperCase(),
                 status,
                 `$${price.toLocaleString('es-CO')}`,
-            ];
+            ]);
         });
-    } else {
+    }
+
+    // Add Payments
+    if (payments && payments.length > 0) {
+        payments.forEach((pay) => {
+            const amount = parseFloat(pay.amount?.toString() || '0');
+            const date = pay.payment_date || '';
+            const formattedDate = date ? new Date(date).toLocaleDateString('es-CO') : '-';
+            tableRows.push([
+                formattedDate,
+                `ABONO / PAGO (${pay.payment_method})`.toUpperCase(),
+                '✓ RECIBIDO',
+                `-$${amount.toLocaleString('es-CO')}`,
+            ]);
+        });
+    }
+
+    if (tableRows.length === 0) {
         tableRows = [
-            [new Date().toLocaleDateString('es-CO'), 'Servicios de Diseño / Producción', '✓ Entregado', `$${totalBalance.toLocaleString('es-CO')}`]
+            [new Date().toLocaleDateString('es-CO'), 'Sin movimientos registrados', '-', '$0']
         ];
     }
 
     doc.autoTable({
-        startY,
-        head: [['FECHA', 'PRODUCTO / SERVICIO', 'ESTADO', 'VALOR']],
+        startY: client.company ? 82 : 78,
+        head: [['FECHA', 'DESCRIPCIÓN', 'ESTADO', 'VALOR']],
         body: tableRows,
         headStyles: {
             fillColor: [15, 15, 15],
@@ -229,24 +258,40 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
 
     // ── Totals Box ───────────────────────────────────────────────
     const finalY = doc.autoTable.previous.finalY + 8;
-    doc.setFillColor(245, 245, 245);
-    doc.rect(pageWidth - 90, finalY, 75, 9, 'F');
-    doc.setTextColor(80, 80, 80);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text('SUBTOTAL:', pageWidth - 87, finalY + 6);
-    doc.text(`$${totalBalance.toLocaleString('es-CO')} COP`, pageWidth - 15, finalY + 6, { align: 'right' });
 
+    // Summary Background
+    doc.setFillColor(245, 245, 245);
+    doc.rect(pageWidth - 90, finalY, 75, 24, 'F');
+
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+
+    // Subtotal Jobs
+    doc.text('SUBTOTAL PROYECTOS:', pageWidth - 87, finalY + 6);
+    doc.text(`$${subtotalJobs.toLocaleString('es-CO')}`, pageWidth - 15, finalY + 6, { align: 'right' });
+
+    // Total Payments
+    doc.text('TOTAL ABONADO:', pageWidth - 87, finalY + 13);
+    doc.setTextColor(34, 197, 94); // Green for payments received
+    doc.text(`-$${totalPayments.toLocaleString('es-CO')}`, pageWidth - 15, finalY + 13, { align: 'right' });
+
+    // Divider in totals
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.1);
+    doc.line(pageWidth - 87, finalY + 16, pageWidth - 15, finalY + 16);
+
+    // Final Balance
     doc.setFillColor(15, 15, 15);
-    doc.rect(pageWidth - 90, finalY + 11, 75, 12, 'F');
+    doc.rect(pageWidth - 90, finalY + 24, 75, 12, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.text('TOTAL A PAGAR:', pageWidth - 87, finalY + 19);
-    doc.text(`$${totalBalance.toLocaleString('es-CO')} COP`, pageWidth - 15, finalY + 19, { align: 'right' });
+    doc.text('SALDO PENDIENTE:', pageWidth - 87, finalY + 32);
+    doc.text(`$${totalBalance.toLocaleString('es-CO')} COP`, pageWidth - 15, finalY + 32, { align: 'right' });
 
     // ── Payment Info ─────────────────────────────────────────────
-    const payY = finalY + 32;
+    const payY = finalY + 45;
     doc.setDrawColor(230, 230, 230);
     doc.setLineWidth(0.3);
     doc.rect(15, payY, 110, 40);
@@ -286,7 +331,7 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.text('Gracias por confiar en Motion Dreams  •  @motiondreams  •  Cali, Colombia', 105, 293, { align: 'center' });
+    doc.text('Gracias por confiar en Motion Dreams  •  motiondreamstudio.com  •  Cali, Colombia', 105, 293, { align: 'center' });
 
     doc.save(`Estado_Cuenta_${client.name.replace(/\s+/g, '_')}.pdf`);
 };

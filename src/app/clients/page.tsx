@@ -25,7 +25,7 @@ export default function ClientsPage() {
     const fetchClients = async () => {
         try {
             setIsLoading(true);
-            const res = await fetch('/api/clients');
+            const res = await fetch('/api/clients', { cache: 'no-store' });
             const data = await res.json();
 
             if (Array.isArray(data)) {
@@ -63,13 +63,24 @@ export default function ClientsPage() {
         } else if (action === 'print') {
             toast.promise(
                 (async () => {
-                    // Fetch the client's jobs to include in the PDF
-                    const jobsRes = await fetch(`/api/clients/${client.id}/jobs`);
+                    // Fetch the client's jobs and payments to include in the PDF
+                    const [jobsRes, paymentsRes] = await Promise.all([
+                        fetch(`/api/clients/${client.id}/jobs`, { cache: 'no-store' }),
+                        fetch(`/api/payments?client_id=${client.id}`, { cache: 'no-store' })
+                    ]);
+
                     const jobs = jobsRes.ok ? await jobsRes.json() : [];
-                    await generateAccountStatementPDF(client, client.total_debt, Array.isArray(jobs) ? jobs : []);
+                    const payments = paymentsRes.ok ? await paymentsRes.json() : [];
+
+                    await generateAccountStatementPDF(
+                        client,
+                        client.total_debt,
+                        Array.isArray(jobs) ? jobs : [],
+                        Array.isArray(payments) ? payments : []
+                    );
                 })(),
                 {
-                    loading: 'Generando PDF con detalle de productos...',
+                    loading: 'Generando PDF con detalle de pagos y productos...',
                     success: `Estado de cuenta de ${client.name} generado`,
                     error: 'Error al generar el PDF',
                 }
@@ -141,7 +152,7 @@ export default function ClientsPage() {
 
             try {
                 console.log('[handleSubmit] Registering payment:', { client: selectedClient.name, amount, type: modalType });
-                
+
                 const res = await fetch('/api/payments', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -156,11 +167,11 @@ export default function ClientsPage() {
                 if (res.ok) {
                     const payment = await res.json();
                     console.log('[handleSubmit] Payment registered:', payment);
-                    
+
                     toast.success(modalType === 'full_settlement' ? '✅ ¡Deuda liquidada con éxito!' : `✅ Abono de $${amount.toLocaleString('es-CO')} registrado`);
                     setIsModalOpen(false);
                     setInputValue('');
-                    
+
                     // Refrescar después de 300ms para asegurar que la BD registró el cambio
                     setTimeout(() => {
                         console.log('[handleSubmit] Refreshing clients after payment');

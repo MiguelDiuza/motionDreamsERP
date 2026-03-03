@@ -68,8 +68,8 @@ export default function FinancesPage() {
             console.log('[FinancesPage] Fetching data...');
 
             const [expensesRes, statsRes] = await Promise.all([
-                fetch(`/api/expenses?t=${Date.now()}`),
-                fetch(`/api/stats/finances?t=${Date.now()}`)
+                fetch(`/api/expenses?t=${Date.now()}`, { cache: 'no-store' }),
+                fetch(`/api/stats/finances?t=${Date.now()}`, { cache: 'no-store' })
             ]);
 
             if (!expensesRes.ok || !statsRes.ok) {
