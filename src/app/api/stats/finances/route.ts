@@ -1,16 +1,35 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    console.log('[GET /api/stats/finances] Fetching finance stats...');
+    const { searchParams } = new URL(request.url);
+    const startParam = searchParams.get('start');
+    const endParam = searchParams.get('end');
+
+    // Default to current month boundary in UTC if parameters aren't provided
+    let dateConditionIncome = `DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', CURRENT_DATE)`;
+    let dateConditionExpenses = `DATE_TRUNC('month', COALESCE(paid_date, created_at::date)) = DATE_TRUNC('month', CURRENT_DATE)`;
+    
+    // Arrays for dynamic bindings
+    const incomeParams = [];
+    const expensesParams = [];
+
+    if (startParam && endParam) {
+        dateConditionIncome = `payment_date >= $1 AND payment_date <= $2`;
+        dateConditionExpenses = `COALESCE(paid_date, created_at::date) >= $1 AND COALESCE(paid_date, created_at::date) <= $2`;
+        incomeParams.push(startParam, endParam);
+        expensesParams.push(startParam, endParam);
+    }
+    
+    console.log('[GET /api/stats/finances] Fetching finance stats for bounds:', { startParam, endParam });
 
     // 1. Monthly Income (Payments this month)
     const incomeMonthResult = await query(`
             SELECT COALESCE(SUM(amount), 0) as total 
             FROM payments 
-            WHERE DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', CURRENT_DATE)
-        `);
+            WHERE ${dateConditionIncome}
+        `, incomeParams);
 
     // 2. All-Time Income
     const incomeTotalResult = await query(`
@@ -23,8 +42,8 @@ export async function GET() {
             SELECT COALESCE(SUM(amount), 0) as total 
             FROM expenses 
             WHERE category = 'BUSINESS' AND is_paid = TRUE
-            AND DATE_TRUNC('month', COALESCE(paid_date, created_at::date)) = DATE_TRUNC('month', CURRENT_DATE)
-        `);
+            AND ${dateConditionExpenses}
+        `, expensesParams);
 
     // 4. All-Time Business Expenses (Paid)
     const bizTotalResult = await query(`
@@ -38,8 +57,8 @@ export async function GET() {
             SELECT COALESCE(SUM(amount), 0) as total 
             FROM expenses 
             WHERE category = 'PERSONAL' AND is_paid = TRUE
-            AND DATE_TRUNC('month', COALESCE(paid_date, created_at::date)) = DATE_TRUNC('month', CURRENT_DATE)
-        `);
+            AND ${dateConditionExpenses}
+        `, expensesParams);
 
     // 6. All-Time Personal Expenses (Paid)
     const personalTotalResult = await query(`

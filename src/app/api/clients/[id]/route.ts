@@ -37,8 +37,10 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
+        await query('DELETE FROM jobs WHERE client_id = $1', [params.id]);
+        await query('DELETE FROM payments WHERE client_id = $1', [params.id]);
         await query('DELETE FROM clients WHERE id = $1', [params.id]);
-        return NextResponse.json({ message: 'Client deleted successfully' });
+        return NextResponse.json({ message: 'Client and associated data deleted successfully' });
     } catch (error) {
         console.error('Error deleting client:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

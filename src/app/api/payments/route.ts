@@ -12,11 +12,19 @@ export async function POST(request: Request) {
             [client_id, amount, payment_method, notes]
         );
 
-        // 2. Subtract from client debt
-        await query(
-            'UPDATE clients SET total_debt = GREATEST(0, total_debt - $1), updated_at = NOW() WHERE id = $2',
+        // 2. Subtract from client debt and check new balance
+        const clientUpdate = await query(
+            'UPDATE clients SET total_debt = GREATEST(0, total_debt - $1), updated_at = NOW() WHERE id = $2 RETURNING total_debt',
             [amount, client_id]
         );
+
+        // 3. Mark completed jobs as PAID if account is fully settled
+        if (clientUpdate.rows.length > 0 && parseFloat(clientUpdate.rows[0].total_debt) <= 0) {
+            await query(
+                `UPDATE jobs SET status = 'PAID' WHERE client_id = $1 AND status = 'COMPLETED'`,
+                [client_id]
+            );
+        }
 
         return NextResponse.json(paymentResult.rows[0], { status: 201 });
     } catch (error) {
@@ -30,7 +38,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const clientId = searchParams.get('client_id');
 
-        let sql = 'SELECT p.*, c.name as client_name FROM payments p JOIN clients c ON p.client_id = c.id';
+        let sql = 'SELECT p.*, COALESCE(c.name, \'Cliente Eliminado\') as client_name FROM payments p LEFT JOIN clients c ON p.client_id = c.id';
         const params = [];
 
         if (clientId) {

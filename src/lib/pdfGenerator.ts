@@ -188,15 +188,38 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
     doc.setTextColor(150);
     doc.text(totalBalance > 0 ? 'SALDO PENDIENTE' : 'SIN DEUDA', pageWidth - 15, 72, { align: 'right' });
 
-    // ── Table Data Combined (Jobs + Payments) ───────────────────
-    const subtotalJobs = jobs.reduce((acc, job) => acc + parseFloat(job.price?.toString() || '0'), 0);
-    const totalPayments = payments.reduce((acc, pay) => acc + parseFloat(pay.amount?.toString() || '0'), 0);
+    // ── Data Filtering ────────────────
+    // Only include jobs that are COMPLETED (Not PENDING, not PAID)
+    const validJobs = jobs.filter(job => job.status === 'COMPLETED');
+    const sortedJobs = [...validJobs].sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+    let totalPaidAllTime = payments.reduce((acc, p) => acc + parseFloat(p.amount.toString()), 0);
+
+    // Identify which jobs are still pending (at least partially)
+    let remainingPaid = totalPaidAllTime;
+    const pendingJobs = sortedJobs.filter(job => {
+        const price = parseFloat(job.price?.toString() || '0');
+        if (remainingPaid >= price) {
+            remainingPaid -= price;
+            return false; // Fully paid
+        }
+        remainingPaid = 0;
+        return true; // Pending or partially paid
+    });
+
+    // Filter recent payments (last 30 days) as requested
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentPayments = payments.filter(p => new Date(p.payment_date) >= thirtyDaysAgo);
+
+    const subtotalJobs = pendingJobs.reduce((acc, job) => acc + parseFloat(job.price?.toString() || '0'), 0);
+    // Calculated "Applied Payments" for the summary to ensure (Subtotal - Applied = Balance)
+    const appliedPayments = subtotalJobs - totalBalance;
 
     let tableRows: any[][] = [];
 
-    // Add Jobs
-    if (jobs && jobs.length > 0) {
-        jobs.forEach((job) => {
+    // Add Pending Jobs
+    if (pendingJobs.length > 0) {
+        pendingJobs.forEach((job) => {
             const price = parseFloat(job.price?.toString() || '0');
             const date = job.completion_date || job.due_date || job.created_at || '';
             const formattedDate = date ? new Date(date).toLocaleDateString('es-CO') : '-';
@@ -210,15 +233,15 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
         });
     }
 
-    // Add Payments
-    if (payments && payments.length > 0) {
-        payments.forEach((pay) => {
+    // Add Recent Payments
+    if (recentPayments.length > 0) {
+        recentPayments.forEach((pay) => {
             const amount = parseFloat(pay.amount?.toString() || '0');
             const date = pay.payment_date || '';
             const formattedDate = date ? new Date(date).toLocaleDateString('es-CO') : '-';
             tableRows.push([
                 formattedDate,
-                `ABONO / PAGO (${pay.payment_method})`.toUpperCase(),
+                `ABONO RECIENTE (${pay.payment_method})`.toUpperCase(),
                 '✓ RECIBIDO',
                 `-$${amount.toLocaleString('es-CO')}`,
             ]);
@@ -227,7 +250,7 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
 
     if (tableRows.length === 0) {
         tableRows = [
-            [new Date().toLocaleDateString('es-CO'), 'Sin movimientos registrados', '-', '$0']
+            [new Date().toLocaleDateString('es-CO'), 'Al día: Sin cuentas pendientes', '-', '$0']
         ];
     }
 
@@ -274,7 +297,7 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
     // Total Payments
     doc.text('TOTAL ABONADO:', pageWidth - 87, finalY + 13);
     doc.setTextColor(34, 197, 94); // Green for payments received
-    doc.text(`-$${totalPayments.toLocaleString('es-CO')}`, pageWidth - 15, finalY + 13, { align: 'right' });
+    doc.text(`-$${appliedPayments.toLocaleString('es-CO')}`, pageWidth - 15, finalY + 13, { align: 'right' });
 
     // Divider in totals
     doc.setDrawColor(200, 200, 200);
