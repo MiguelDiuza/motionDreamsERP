@@ -211,17 +211,20 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
     let appliedPayments = subtotalJobs - totalBalance;
 
     // Si cuenta saldada o con saldo a favor, se crea una cuenta limpia sin registro de pagos pasados ni de proyectos pagados
-    if (totalBalance <= 0) {
+    if (parseFloat(totalBalance.toString()) <= 0) {
         pendingJobs = [];
         subtotalJobs = 0;
         appliedPayments = 0;
     }
 
     // Considerar pagos únicamente como "abonos" a la deuda pendiente actual
+    // Se excluyen las "Liquidaciones Totales" del historial para no confundir al cliente
     let recentPayments: any[] = [];
     if (appliedPayments > 0 && totalBalance > 0) {
         let remainingAbonoToFind = appliedPayments;
-        const sortedPaymentsDesc = [...payments].sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
+        const sortedPaymentsDesc = [...payments]
+            .filter(p => !p.payment_method?.toLowerCase().includes('liquidaci'))
+            .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
         
         for (const pay of sortedPaymentsDesc) {
             if (remainingAbonoToFind <= 0) break;
