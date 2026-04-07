@@ -196,7 +196,7 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
 
     // Identify which jobs are still pending (at least partially)
     let remainingPaid = totalPaidAllTime;
-    const pendingJobs = sortedJobs.filter(job => {
+    let pendingJobs = sortedJobs.filter(job => {
         const price = parseFloat(job.price?.toString() || '0');
         if (remainingPaid >= price) {
             remainingPaid -= price;
@@ -206,14 +206,34 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
         return true; // Pending or partially paid
     });
 
-    // Filter recent payments (last 30 days) as requested
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentPayments = payments.filter(p => new Date(p.payment_date) >= thirtyDaysAgo);
-
-    const subtotalJobs = pendingJobs.reduce((acc, job) => acc + parseFloat(job.price?.toString() || '0'), 0);
+    let subtotalJobs = pendingJobs.reduce((acc, job) => acc + parseFloat(job.price?.toString() || '0'), 0);
     // Calculated "Applied Payments" for the summary to ensure (Subtotal - Applied = Balance)
-    const appliedPayments = subtotalJobs - totalBalance;
+    let appliedPayments = subtotalJobs - totalBalance;
+
+    // Si cuenta saldada o con saldo a favor, se crea una cuenta limpia sin registro de pagos pasados ni de proyectos pagados
+    if (totalBalance <= 0) {
+        pendingJobs = [];
+        subtotalJobs = 0;
+        appliedPayments = 0;
+    }
+
+    // Considerar pagos únicamente como "abonos" a la deuda pendiente actual
+    let recentPayments: any[] = [];
+    if (appliedPayments > 0 && totalBalance > 0) {
+        let remainingAbonoToFind = appliedPayments;
+        const sortedPaymentsDesc = [...payments].sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
+        
+        for (const pay of sortedPaymentsDesc) {
+            if (remainingAbonoToFind <= 0) break;
+            const payAmount = parseFloat(pay.amount?.toString() || '0');
+            const usedAmount = Math.min(payAmount, remainingAbonoToFind);
+            recentPayments.push({
+                ...pay,
+                amount: usedAmount
+            });
+            remainingAbonoToFind -= usedAmount;
+        }
+    }
 
     let tableRows: any[][] = [];
 
@@ -241,7 +261,7 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
             const formattedDate = date ? new Date(date).toLocaleDateString('es-CO') : '-';
             tableRows.push([
                 formattedDate,
-                `ABONO RECIENTE (${pay.payment_method})`.toUpperCase(),
+                `ABONO (${pay.payment_method})`.toUpperCase(),
                 '✓ RECIBIDO',
                 `-$${amount.toLocaleString('es-CO')}`,
             ]);
