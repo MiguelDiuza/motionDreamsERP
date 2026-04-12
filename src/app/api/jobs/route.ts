@@ -7,6 +7,8 @@ export async function GET() {
       SELECT j.*, c.name as client_name, c.company_name 
       FROM jobs j
       JOIN clients c ON j.client_id = c.id
+      WHERE j.status = 'PENDING' 
+         OR (j.status = 'COMPLETED' AND j.completion_date >= NOW() - INTERVAL '7 days')
       ORDER BY 
         CASE WHEN j.status = 'PENDING' THEN 0 ELSE 1 END,
         j.due_date ASC,
