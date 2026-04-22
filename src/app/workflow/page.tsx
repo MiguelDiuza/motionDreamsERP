@@ -31,8 +31,13 @@ export default function WorkflowPage() {
         client_id: '',
         title: '',
         price: '',
+        estimated_minutes: '',
         due_date: new Date().toISOString().split('T')[0]
     });
+
+    const [timeModalOpen, setTimeModalOpen] = useState(false);
+    const [completingJobId, setCompletingJobId] = useState('');
+    const [actualMinutes, setActualMinutes] = useState('');
 
     const fetchJobs = async () => {
         try {
@@ -88,14 +93,15 @@ export default function WorkflowPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...newJob,
-                    price: parseFloat(newJob.price)
+                    price: parseFloat(newJob.price),
+                    estimated_minutes: parseInt(newJob.estimated_minutes) || 0
                 })
             });
 
             if (res.ok) {
                 toast.success('Proyecto registrado con éxito');
                 setIsModalOpen(false);
-                setNewJob({ client_id: '', title: '', price: '', due_date: new Date().toISOString().split('T')[0] });
+                setNewJob({ client_id: '', title: '', price: '', estimated_minutes: '', due_date: new Date().toISOString().split('T')[0] });
                 fetchJobs();
             }
         } catch (error) {
@@ -103,8 +109,67 @@ export default function WorkflowPage() {
         }
     };
 
+    const updateProgress = async (id: string, newLevel: number) => {
+        try {
+            if (newLevel === 3) {
+                // If they click the 3rd level, act like completing the job
+                setCompletingJobId(id);
+                setActualMinutes('');
+                setTimeModalOpen(true);
+                return;
+            }
+
+            const res = await fetch(`/api/jobs/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ progress_level: newLevel })
+            });
+
+            if (res.ok) {
+                toast.success(`Nivel de progreso ${newLevel}/3`);
+                fetchJobs();
+            }
+        } catch (error) {
+            toast.error('Error al actualizar progreso');
+        }
+    };
+
+    const confirmCompletion = async () => {
+        if (!actualMinutes) return toast.warning('Ingresa el tiempo que tardaste');
+
+        try {
+            const res = await fetch(`/api/jobs/${completingJobId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    status: 'COMPLETED', 
+                    actual_minutes: parseInt(actualMinutes) || 0 
+                })
+            });
+
+            if (res.ok) {
+                toast.success('¡Proyecto Completado! El valor se ha sumado a la deuda del cliente.', {
+                    duration: 4000
+                });
+                setTimeModalOpen(false);
+                setCompletingJobId('');
+                setActualMinutes('');
+                fetchJobs();
+            }
+        } catch (error) {
+            toast.error('Error al actualizar estado');
+        }
+    };
+
     const toggleStatus = async (id: string, currentStatus: string) => {
-        const newStatus = currentStatus === 'PENDING' ? 'COMPLETED' : 'PENDING';
+        if (currentStatus === 'PENDING') {
+            setCompletingJobId(id);
+            setActualMinutes('');
+            setTimeModalOpen(true);
+            return;
+        }
+
+        const newStatus = 'PENDING';
 
         try {
             const res = await fetch(`/api/jobs/${id}`, {
@@ -227,14 +292,35 @@ export default function WorkflowPage() {
                                     <PriorityIcon priority={calculatePriority(job.due_date)} />
                                 </div>
 
+                                {/* Progress UI (Moved to the left) */}
+                                {job.status !== 'COMPLETED' && (
+                                    <div className="flex md:flex-col gap-2 items-center flex-shrink-0">
+                                        {[1, 2, 3].map(level => (
+                                            <button 
+                                                key={level}
+                                                onClick={() => updateProgress(job.id, level)}
+                                                className={`rounded-full transition-all ${
+                                                    (job.progress_level || 0) >= level 
+                                                        ? 'w-8 md:w-2 h-2 md:h-8 bg-brand-red shadow-[0_0_10px_rgba(242,15,15,0.5)]' 
+                                                        : 'w-4 md:w-2 h-2 md:h-4 bg-white/10 hover:bg-white/20'
+                                                }`}
+                                                title={`Nivel ${level}`}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+
                                 {/* Content */}
                                 <div className="flex-1 min-w-0 text-center md:text-left">
                                     <h3 className={`text-xl font-black uppercase tracking-tight text-white mb-1 ${job.status === 'COMPLETED' ? 'line-through opacity-50' : ''}`}>
                                         {job.title}
                                     </h3>
-                                    <div className="flex flex-wrap justify-center md:justify-start items-center gap-4 text-[10px] font-bold text-white/30 uppercase tracking-widest">
+                                    <div className="flex flex-wrap justify-center md:justify-start items-center gap-4 mt-3 text-[10px] font-bold text-white/30 uppercase tracking-widest">
                                         <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-full">
                                             <User size={12} className="text-brand-red" /> {job.client_name}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-full">
+                                            <Clock size={12} /> {job.estimated_minutes || 0} min
                                         </div>
                                         <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-full">
                                             <Calendar size={12} /> Entrega: {new Date(job.due_date).toLocaleDateString()}
@@ -289,7 +375,7 @@ export default function WorkflowPage() {
                         placeholder="Ej. Pack de 10 Reels"
                     />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <FormField
                             icon={DollarSign}
                             label="Precio del Proyecto (COP)"
@@ -297,6 +383,14 @@ export default function WorkflowPage() {
                             value={newJob.price}
                             onChange={(v: string) => setNewJob({ ...newJob, price: v })}
                             placeholder="0"
+                        />
+                        <FormField
+                            icon={Clock}
+                            label="Tiempo Estimado (min)"
+                            type="number"
+                            value={newJob.estimated_minutes}
+                            onChange={(v: string) => setNewJob({ ...newJob, estimated_minutes: v })}
+                            placeholder="Ej. 120"
                         />
                         <FormField
                             icon={Calendar}
@@ -311,6 +405,27 @@ export default function WorkflowPage() {
                     <div className="grid grid-cols-2 gap-4 pt-4 uppercase">
                         <button onClick={() => setIsModalOpen(false)} className="py-4 rounded-2xl bg-white/5 text-white/40 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all">Cancelar</button>
                         <button onClick={handleCreateJob} className="py-4 rounded-2xl bg-brand-red text-white text-[10px] font-black uppercase tracking-widest hover:bg-red-600 shadow-xl shadow-brand-red/20 transition-all border border-white/10">Registrar Proyecto</button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Time Completion Modal */}
+            <Modal isOpen={timeModalOpen} onClose={() => setTimeModalOpen(false)} title="Finalizar Tarea">
+                <div className="space-y-6">
+                    <p className="text-sm font-bold text-white/50 uppercase">
+                        ¡Gran trabajo! Para mantener el control de rendimiento, ingresa el tiempo real que tomaste.
+                    </p>
+                    <FormField
+                        icon={Clock}
+                        label="Tiempo Real (Minutos)"
+                        type="number"
+                        value={actualMinutes}
+                        onChange={(v: string) => setActualMinutes(v)}
+                        placeholder="Ej. 135"
+                    />
+                    <div className="grid grid-cols-2 gap-4 pt-4 uppercase">
+                        <button onClick={() => setTimeModalOpen(false)} className="py-4 rounded-2xl bg-white/5 text-white/40 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all">Cancelar</button>
+                        <button onClick={confirmCompletion} className="py-4 rounded-2xl bg-brand-red text-white text-[10px] font-black uppercase tracking-widest hover:bg-red-600 shadow-xl shadow-brand-red/20 transition-all border border-white/10">Confirmar</button>
                     </div>
                 </div>
             </Modal>

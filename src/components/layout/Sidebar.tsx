@@ -11,7 +11,8 @@ import {
     ChevronRight,
     LayoutDashboard,
     Menu,
-    X
+    X,
+    Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -24,6 +25,7 @@ const Sidebar = () => {
         { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
         { name: 'Clientes & Cuentas', icon: Users, path: '/clients' },
         { name: 'Flujo de Trabajo', icon: Briefcase, path: '/workflow' },
+        { name: 'Horario', icon: Calendar, path: '/schedule' },
         { name: 'Finanzas & Gastos', icon: Wallet, path: '/finances' },
     ];
 

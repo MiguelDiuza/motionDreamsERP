@@ -24,11 +24,11 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { client_id, title, price, due_date } = body;
+        const { client_id, title, price, due_date, estimated_minutes } = body;
 
         const result = await query(
-            'INSERT INTO jobs (client_id, title, price, due_date, status) VALUES ($1, $2, $3, $4, \'PENDING\') RETURNING *',
-            [client_id, title, price, due_date]
+            'INSERT INTO jobs (client_id, title, price, due_date, estimated_minutes, status) VALUES ($1, $2, $3, $4, $5, \'PENDING\') RETURNING *',
+            [client_id, title, price, due_date, estimated_minutes || 0]
         );
 
         // User requested that debt is added ONLY when job is marked as COMPLETED.

@@ -40,6 +40,7 @@ export default function Dashboard() {
         client_id: '',
         title: '',
         price: '',
+        estimated_minutes: '',
         due_date: new Date().toISOString().split('T')[0]
     });
 
@@ -116,14 +117,15 @@ export default function Dashboard() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...newJob,
-                    price: parseFloat(newJob.price)
+                    price: parseFloat(newJob.price),
+                    estimated_minutes: parseInt(newJob.estimated_minutes) || 0
                 })
             });
 
             if (res.ok) {
                 toast.success('Trabajo iniciado y registrado');
                 setIsModalOpen(false);
-                setNewJob({ client_id: '', title: '', price: '', due_date: new Date().toISOString().split('T')[0] });
+                setNewJob({ client_id: '', title: '', price: '', estimated_minutes: '', due_date: new Date().toISOString().split('T')[0] });
                 fetchDashboardData();
             }
         } catch (error) {
@@ -313,7 +315,7 @@ export default function Dashboard() {
                         placeholder="Ej. Pack de 10 Reels"
                     />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <FormField
                             icon={DollarSign}
                             label="Presupuesto (COP)"
@@ -321,6 +323,14 @@ export default function Dashboard() {
                             value={newJob.price}
                             onChange={(v: string) => setNewJob({ ...newJob, price: v })}
                             placeholder="0"
+                        />
+                        <FormField
+                            icon={Clock}
+                            label="Tiempo Estimado (min)"
+                            type="number"
+                            value={newJob.estimated_minutes}
+                            onChange={(v: string) => setNewJob({ ...newJob, estimated_minutes: v })}
+                            placeholder="Ej. 120"
                         />
                         <FormField
                             icon={Calendar}

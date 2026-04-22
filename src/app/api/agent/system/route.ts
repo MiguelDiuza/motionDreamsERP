@@ -3,7 +3,7 @@ import { query } from '@/lib/db';
 
 export async function GET() {
   try {
-    // 1. Income this month (from payments table)
+    // 1. Income this month
     const incomeMonthResult = await query(`
       SELECT COALESCE(SUM(amount), 0) as total 
       FROM payments 
@@ -16,22 +16,22 @@ export async function GET() {
       FROM payments
     `);
 
-    // 3. Expenses this month (only paid ones) - BOTH BUSINESS AND PERSONAL
-    const expensesMonthPoints = await query(`
+    // 3. Expenses this month
+    const expensesMonthResult = await query(`
       SELECT COALESCE(SUM(amount), 0) as total 
       FROM expenses 
       WHERE is_paid = TRUE 
       AND DATE_TRUNC('month', COALESCE(paid_date, created_at::date)) = DATE_TRUNC('month', CURRENT_DATE)
     `);
 
-    // 4. All-time Expenses (paid ones) - BOTH BUSINESS AND PERSONAL
+    // 4. All-time Expenses
     const expensesTotalResult = await query(`
       SELECT COALESCE(SUM(amount), 0) as total 
       FROM expenses 
       WHERE is_paid = TRUE
     `);
 
-    // 5. Client Debt (Total account receivable)
+    // 5. Client Debt
     const debtResult = await query(`
       SELECT COALESCE(SUM(total_debt), 0) as total 
       FROM clients
@@ -47,22 +47,18 @@ export async function GET() {
     `);
 
     const response = {
-      incomeMonth: parseFloat(incomeMonthResult.rows[0].total),
-      incomeTotal: parseFloat(incomeTotalResult.rows[0].total),
-      expensesMonth: parseFloat(expensesMonthPoints.rows[0].total),
-      expensesTotal: parseFloat(expensesTotalResult.rows[0].total),
-      clientDebt: parseFloat(debtResult.rows[0].total),
-      activeJobsCount: parseInt(jobsResult.rows[0].count),
-      activeJobsValue: parseFloat(jobsResult.rows[0].value)
+      income_month_cop: parseFloat(incomeMonthResult.rows[0].total),
+      income_total_cop: parseFloat(incomeTotalResult.rows[0].total),
+      expenses_month_cop: parseFloat(expensesMonthResult.rows[0].total),
+      expenses_total_cop: parseFloat(expensesTotalResult.rows[0].total),
+      total_client_debt_cop: parseFloat(debtResult.rows[0].total),
+      active_pending_jobs_count: parseInt(jobsResult.rows[0].count),
+      active_pending_jobs_value_cop: parseFloat(jobsResult.rows[0].value),
+      system_date: new Date().toISOString()
     };
 
-    const res = NextResponse.json(response);
-    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.headers.set('Pragma', 'no-cache');
-    res.headers.set('Expires', '0');
-    return res;
-  } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(response);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

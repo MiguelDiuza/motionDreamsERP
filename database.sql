@@ -24,6 +24,19 @@ CREATE TABLE jobs (
     status VARCHAR(50) DEFAULT 'PENDING', -- 'PENDING', 'COMPLETED'
     completion_date TIMESTAMP WITH TIME ZONE,
     hours_estimated INT DEFAULT 0,
+    progress_level INT DEFAULT 0,
+    estimated_minutes INT DEFAULT 0,
+    scheduled_date DATE,
+    scheduled_time VARCHAR(10),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2.5 TIME LOGS
+CREATE TABLE time_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    job_id UUID REFERENCES jobs(id) ON DELETE CASCADE,
+    estimated_minutes INT DEFAULT 0,
+    actual_minutes INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

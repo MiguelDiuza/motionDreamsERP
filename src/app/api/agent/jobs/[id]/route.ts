@@ -9,8 +9,8 @@ export async function PATCH(
         const body = await request.json();
         const { status, progress_level, scheduled_date, scheduled_time, actual_minutes } = body;
 
-        // 1. Get current job state to check for transition
-        const jobResult = await query('SELECT client_id, price, status FROM jobs WHERE id = $1', [params.id]);
+        // 1. Get current job state
+        const jobResult = await query('SELECT client_id, price, status, estimated_minutes FROM jobs WHERE id = $1', [params.id]);
         if (!jobResult.rowCount || jobResult.rowCount === 0) {
             return NextResponse.json({ error: 'Job not found' }, { status: 404 });
         }
@@ -55,7 +55,7 @@ export async function PATCH(
             if (actual_minutes !== undefined) {
                 await query(
                     'INSERT INTO time_logs (job_id, estimated_minutes, actual_minutes) VALUES ($1, $2, $3)',
-                    [params.id, result.rows[0].estimated_minutes || 0, actual_minutes]
+                    [params.id, oldJob.estimated_minutes || 0, actual_minutes]
                 );
             }
         }
@@ -65,31 +65,7 @@ export async function PATCH(
         }
 
         return NextResponse.json(result.rows[0]);
-    } catch (error) {
-        console.error('Error updating job status:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
-}
-
-export async function DELETE(
-    request: Request,
-    { params }: { params: { id: string } }
-) {
-    try {
-        const jobResult = await query('SELECT client_id, price, status FROM jobs WHERE id = $1', [params.id]);
-
-        if (jobResult.rowCount && jobResult.rowCount > 0) {
-            const job = jobResult.rows[0];
-            // If the job was COMPLETED, it was added to the debt. Deleting means we must remove it.
-            if (job.status === 'COMPLETED') {
-                await query('UPDATE clients SET total_debt = GREATEST(0, total_debt - $1) WHERE id = $2', [job.price, job.client_id]);
-            }
-        }
-
-        await query('DELETE FROM jobs WHERE id = $1', [params.id]);
-        return NextResponse.json({ message: 'Job deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting job:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
