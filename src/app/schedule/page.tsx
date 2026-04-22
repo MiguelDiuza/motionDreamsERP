@@ -157,8 +157,8 @@ export default function SchedulePage() {
                                 </h3>
                                 <div className="grid gap-4">
                                     {groupedByDate[dateStr]
-                                        .sort((a, b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || ''))
-                                        .map(job => (
+                                        .sort((a: any, b: any) => (a.scheduled_time || '').localeCompare(b.scheduled_time || ''))
+                                        .map((job: any) => (
                                         <GlassCard key={job.id} className="p-5 border-l-4 border-l-brand-red hover:bg-white/5 transition-all cursor-pointer" onClick={() => openAssignModal(job)}>
                                             <div className="flex justify-between items-start gap-4">
                                                 <div>
