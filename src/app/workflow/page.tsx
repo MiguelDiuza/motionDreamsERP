@@ -179,13 +179,7 @@ export default function WorkflowPage() {
             });
 
             if (res.ok) {
-                if (newStatus === 'COMPLETED') {
-                    toast.success('¡Proyecto Completado! El valor se ha sumado a la deuda del cliente.', {
-                        duration: 4000
-                    });
-                } else {
-                    toast.info('Proyecto marcado como pendiente.');
-                }
+                toast.info('Proyecto marcado como pendiente.');
                 fetchJobs();
             }
         } catch (error) {
