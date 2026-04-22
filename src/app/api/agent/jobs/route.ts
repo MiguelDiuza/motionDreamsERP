@@ -43,8 +43,8 @@ export async function POST(request: Request) {
         }
 
         const result = await query(
-            \`INSERT INTO jobs (client_id, title, description, price, due_date, estimated_minutes, status) 
-             VALUES ($1, $2, $3, $4, $5, $6, 'PENDING') RETURNING *\`,
+            `INSERT INTO jobs (client_id, title, description, price, due_date, estimated_minutes, status) 
+             VALUES ($1, $2, $3, $4, $5, $6, 'PENDING') RETURNING *`,
             [client_id, title, description || null, price_cop, due_date || null, estimated_minutes || 0]
         );
 
