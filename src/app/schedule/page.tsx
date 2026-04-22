@@ -159,8 +159,9 @@ export default function SchedulePage() {
                                     {groupedByDate[dateStr]
                                         .sort((a: any, b: any) => (a.scheduled_time || '').localeCompare(b.scheduled_time || ''))
                                         .map((job: any) => (
-                                        <GlassCard key={job.id} className="p-5 border-l-4 border-l-brand-red hover:bg-white/5 transition-all cursor-pointer" onClick={() => openAssignModal(job)}>
-                                            <div className="flex justify-between items-start gap-4">
+                                        <div key={job.id} onClick={() => openAssignModal(job)} className="cursor-pointer group">
+                                            <GlassCard className="p-5 border-l-4 border-l-brand-red hover:bg-white/5 transition-all">
+                                                <div className="flex justify-between items-start gap-4">
                                                 <div>
                                                     <div className="flex items-center gap-3 mb-2">
                                                         <span className="bg-brand-red/20 text-brand-red px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
@@ -177,6 +178,7 @@ export default function SchedulePage() {
                                                 </div>
                                             </div>
                                         </GlassCard>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
