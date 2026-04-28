@@ -189,8 +189,8 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
     doc.text(totalBalance > 0 ? 'SALDO PENDIENTE' : 'SIN DEUDA', pageWidth - 15, 72, { align: 'right' });
 
     // ── Data Filtering ────────────────
-    // Only include jobs that are COMPLETED (Not PENDING, not PAID)
-    const validJobs = jobs.filter(job => job.status === 'COMPLETED');
+    // Only include jobs that are COMPLETED or PAID (to correctly calculate remaining balance)
+    const validJobs = jobs.filter(job => ['COMPLETED', 'PAID'].includes(job.status));
     const sortedJobs = [...validJobs].sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
     let totalPaidAllTime = payments.reduce((acc, p) => acc + parseFloat(p.amount.toString()), 0);
 
@@ -208,6 +208,7 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
 
     let subtotalJobs = pendingJobs.reduce((acc, job) => acc + parseFloat(job.price?.toString() || '0'), 0);
     // Calculated "Applied Payments" for the summary to ensure (Subtotal - Applied = Balance)
+    // If balance > subtotal, it means there are manual charges (negative applied payments)
     let appliedPayments = subtotalJobs - totalBalance;
 
     // Si cuenta saldada o con saldo a favor, se crea una cuenta limpia sin registro de pagos pasados ni de proyectos pagados
@@ -318,9 +319,12 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
     doc.text(`$${subtotalJobs.toLocaleString('es-CO')}`, pageWidth - 15, finalY + 6, { align: 'right' });
 
     // Total Payments
-    doc.text('TOTAL ABONADO:', pageWidth - 87, finalY + 13);
-    doc.setTextColor(34, 197, 94); // Green for payments received
-    doc.text(`-$${appliedPayments.toLocaleString('es-CO')}`, pageWidth - 15, finalY + 13, { align: 'right' });
+    doc.text(appliedPayments >= 0 ? 'TOTAL ABONADO:' : 'AJUSTE / CARGOS:', pageWidth - 87, finalY + 13);
+    doc.setTextColor(appliedPayments >= 0 ? [34, 197, 94] : [242, 15, 15]); // Green for payments, Red for extra charges
+    const appliedText = appliedPayments >= 0 
+        ? `-$${appliedPayments.toLocaleString('es-CO')}` 
+        : `+$${Math.abs(appliedPayments).toLocaleString('es-CO')}`;
+    doc.text(appliedText, pageWidth - 15, finalY + 13, { align: 'right' });
 
     // Divider in totals
     doc.setDrawColor(200, 200, 200);
