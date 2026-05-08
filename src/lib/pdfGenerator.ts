@@ -188,8 +188,25 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
     doc.setTextColor(150);
     doc.text(totalBalance > 0 ? 'SALDO PENDIENTE' : 'SIN DEUDA', pageWidth - 15, 72, { align: 'right' });
 
-    // ── Data Filtering ────────────────
-    const validJobs = jobs.filter(job => ['COMPLETED', 'PAID'].includes(job.status));
+    // ── Data Filtering (Multi-Account Logic) ────────────────
+    // Encontramos la fecha de la última "Liquidación Total" para separar las cuentas
+    const settlements = payments
+        .filter(p => p.payment_method?.toLowerCase().includes('liquidaci'))
+        .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
+    
+    const lastSettlementDate = settlements.length > 0 
+        ? new Date(settlements[0].payment_date).getTime() 
+        : 0;
+
+    // Solo mostramos trabajos que se completaron después de la última liquidación
+    const validJobs = jobs.filter(job => {
+        const isStatusValid = ['COMPLETED', 'PAID'].includes(job.status);
+        if (!isStatusValid) return false;
+        
+        const jobDate = new Date(job.completion_date || job.created_at || 0).getTime();
+        return jobDate > lastSettlementDate;
+    });
+
     let pendingJobs = [...validJobs].sort((a, b) =>
         new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
     );
@@ -198,18 +215,24 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
         acc + parseFloat(job.price?.toString() || '0'), 0
     );
 
-    // ✅ Fix: sumar todos los pagos reales, no derivar de totalBalance
-    const totalPaid = payments.reduce((acc, p) =>
+    // Solo consideramos pagos (abonos) realizados después de la última liquidación
+    const currentPayments = payments.filter(p => {
+        const payDate = new Date(p.payment_date).getTime();
+        return payDate > lastSettlementDate && !p.payment_method?.toLowerCase().includes('liquidaci');
+    });
+
+    const totalPaid = currentPayments.reduce((acc, p) =>
         acc + parseFloat(p.amount?.toString() || '0'), 0
     );
+    
     let appliedPayments = Math.min(totalPaid, subtotalJobs);
 
     // ✅ Fix: NO limpiar jobs cuando balance = 0, siempre mostrar el detalle
     let recentPayments: any[] = [];
     if (appliedPayments > 0) {
         let remainingAbonoToFind = appliedPayments;
-        const sortedPaymentsDesc = [...payments]
-            .filter(p => !p.payment_method?.toLowerCase().includes('liquidaci'))
+        // Usamos currentPayments para el historial reciente
+        const sortedPaymentsDesc = [...currentPayments]
             .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
 
         for (const pay of sortedPaymentsDesc) {
