@@ -200,7 +200,9 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
 
     // Solo mostramos trabajos que se completaron después de la última liquidación
     const validJobs = jobs.filter(job => {
-        const isStatusValid = ['COMPLETED', 'PAID'].includes(job.status);
+        // Solo incluimos trabajos con estado COMPLETED (Entregado)
+        // Los trabajos en proceso o ya pagados individualmente se excluyen para evitar confusiones en el saldo
+        const isStatusValid = job.status === 'COMPLETED';
         if (!isStatusValid) return false;
         
         const jobDate = new Date(job.completion_date || job.created_at || 0).getTime();
@@ -246,13 +248,13 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
 
     let tableRows: any[][] = [];
 
-    // Add Pending Jobs
+    // Add Completed Jobs (Entregados)
     if (pendingJobs.length > 0) {
         pendingJobs.forEach((job) => {
             const price = parseFloat(job.price?.toString() || '0');
             const date = job.completion_date || job.due_date || job.created_at || '';
             const formattedDate = date ? new Date(date).toLocaleDateString('es-CO') : '-';
-            const status = job.status === 'COMPLETED' ? '✓ Entregado' : '⏳ Pendiente';
+            const status = '✓ Entregado';
             tableRows.push([
                 formattedDate,
                 job.title.toUpperCase(),
