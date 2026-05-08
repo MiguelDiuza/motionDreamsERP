@@ -189,52 +189,34 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
     doc.text(totalBalance > 0 ? 'SALDO PENDIENTE' : 'SIN DEUDA', pageWidth - 15, 72, { align: 'right' });
 
     // ── Data Filtering ────────────────
-    // Only include jobs that are COMPLETED or PAID (to correctly calculate remaining balance)
     const validJobs = jobs.filter(job => ['COMPLETED', 'PAID'].includes(job.status));
-    const sortedJobs = [...validJobs].sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
-    let totalPaidAllTime = payments.reduce((acc, p) => acc + parseFloat(p.amount.toString()), 0);
+    let pendingJobs = [...validJobs].sort((a, b) =>
+        new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+    );
 
-    // Identify which jobs are still pending (at least partially)
-    let remainingPaid = totalPaidAllTime;
-    let pendingJobs = sortedJobs.filter(job => {
-        const price = parseFloat(job.price?.toString() || '0');
-        if (remainingPaid >= price) {
-            remainingPaid -= price;
-            return false; // Fully paid
-        }
-        remainingPaid = 0;
-        return true; // Pending or partially paid
-    });
+    let subtotalJobs = pendingJobs.reduce((acc, job) =>
+        acc + parseFloat(job.price?.toString() || '0'), 0
+    );
 
-    let subtotalJobs = pendingJobs.reduce((acc, job) => acc + parseFloat(job.price?.toString() || '0'), 0);
-    // Calculated "Applied Payments" for the summary to ensure (Subtotal - Applied = Balance)
-    // If balance > subtotal, it means there are manual charges (negative applied payments)
-    let appliedPayments = subtotalJobs - totalBalance;
+    // ✅ Fix: sumar todos los pagos reales, no derivar de totalBalance
+    const totalPaid = payments.reduce((acc, p) =>
+        acc + parseFloat(p.amount?.toString() || '0'), 0
+    );
+    let appliedPayments = Math.min(totalPaid, subtotalJobs);
 
-    // Si cuenta saldada o con saldo a favor, se crea una cuenta limpia sin registro de pagos pasados ni de proyectos pagados
-    if (parseFloat(totalBalance.toString()) <= 0) {
-        pendingJobs = [];
-        subtotalJobs = 0;
-        appliedPayments = 0;
-    }
-
-    // Considerar pagos únicamente como "abonos" a la deuda pendiente actual
-    // Se excluyen las "Liquidaciones Totales" del historial para no confundir al cliente
+    // ✅ Fix: NO limpiar jobs cuando balance = 0, siempre mostrar el detalle
     let recentPayments: any[] = [];
-    if (appliedPayments > 0 && totalBalance > 0) {
+    if (appliedPayments > 0) {
         let remainingAbonoToFind = appliedPayments;
         const sortedPaymentsDesc = [...payments]
             .filter(p => !p.payment_method?.toLowerCase().includes('liquidaci'))
             .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
-        
+
         for (const pay of sortedPaymentsDesc) {
             if (remainingAbonoToFind <= 0) break;
             const payAmount = parseFloat(pay.amount?.toString() || '0');
             const usedAmount = Math.min(payAmount, remainingAbonoToFind);
-            recentPayments.push({
-                ...pay,
-                amount: usedAmount
-            });
+            recentPayments.push({ ...pay, amount: usedAmount });
             remainingAbonoToFind -= usedAmount;
         }
     }
@@ -320,7 +302,7 @@ export const generateAccountStatementPDF = async (client: any, totalBalance: num
 
     // Total Payments
     doc.text(appliedPayments >= 0 ? 'TOTAL ABONADO:' : 'AJUSTE / CARGOS:', pageWidth - 87, finalY + 13);
-    doc.setTextColor(appliedPayments >= 0 ? [34, 197, 94] : [242, 15, 15]); // Green for payments, Red for extra charges
+    if (appliedPayments >= 0) { doc.setTextColor(34, 197, 94); } else { doc.setTextColor(242, 15, 15); } // Green for payments, Red for extra charges
     const appliedText = appliedPayments >= 0 
         ? `-$${appliedPayments.toLocaleString('es-CO')}` 
         : `+$${Math.abs(appliedPayments).toLocaleString('es-CO')}`;
