@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireAgentToken } from '@/lib/agentAuth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const unauthorized = requireAgentToken(request);
+  if (unauthorized) return unauthorized;
+
   try {
     // 1. Income this month
     const incomeMonthResult = await query(`

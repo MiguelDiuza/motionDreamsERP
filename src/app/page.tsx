@@ -22,15 +22,26 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
+// 5 working days * 9h workday (09:00-18:00 Bogota).
+const WEEKLY_CAPACITY_MIN = 5 * 9 * 60;
+
+function formatHours(minutes: number) {
+    if (!minutes) return '0h';
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
+}
+
 export default function Dashboard() {
-    const [stats, setStats] = useState({
+    const [stats, setStats] = useState<any>({
         incomeMonth: 0,
         incomeTotal: 0,
         expensesMonth: 0,
         expensesTotal: 0,
         clientDebt: 0,
         activeJobsCount: 0,
-        activeJobsValue: 0
+        activeJobsValue: 0,
+        scheduledThisWeek: { totalMinutes: 0, byMember: [] }
     });
     const [clients, setClients] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -238,18 +249,37 @@ export default function Dashboard() {
 
                         <div className="glass p-6 rounded-3xl border border-white/5 flex flex-col justify-center">
                             <div className="flex items-center justify-between mb-4">
-                                <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Estado del Mes</span>
-                                <span className="text-[10px] font-black text-blue-500 uppercase bg-blue-500/10 px-3 py-1 rounded-full">Operativo</span>
+                                <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Carga Agendada (Semana)</span>
+                                <span className="text-[10px] font-black text-blue-500 uppercase bg-blue-500/10 px-3 py-1 rounded-full">
+                                    {formatHours(stats.scheduledThisWeek?.totalMinutes || 0)}
+                                </span>
                             </div>
-                            <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-                                <motion.div
-                                    className="bg-brand-red h-full"
-                                    initial={{ width: 0 }}
-                                    animate={{ width: '65%' }}
-                                    transition={{ duration: 1.5, ease: "easeOut" }}
-                                />
-                            </div>
-                            <p className="text-[9px] font-black text-white/20 uppercase mt-4">65% de la capacidad alcanzada</p>
+                            {(stats.scheduledThisWeek?.byMember?.length || 0) === 0 ? (
+                                <p className="text-[9px] font-black text-white/20 uppercase mt-2">Nada agendado esta semana</p>
+                            ) : (
+                                <div className="space-y-3 mt-1">
+                                    {stats.scheduledThisWeek.byMember.map((m: any) => {
+                                        const cap = WEEKLY_CAPACITY_MIN; // 5 días * 9h
+                                        const pct = Math.min(100, Math.round((m.minutes / cap) * 100));
+                                        return (
+                                            <div key={m.id}>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="text-[9px] font-black text-white/50 uppercase tracking-wider">{m.name}</span>
+                                                    <span className="text-[9px] font-black text-white/30 uppercase">{m.jobs} trab · {formatHours(m.minutes)}</span>
+                                                </div>
+                                                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                                    <motion.div
+                                                        className={`h-full ${pct >= 100 ? 'bg-brand-red' : pct >= 70 ? 'bg-amber-400' : 'bg-green-500'}`}
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${pct}%` }}
+                                                        transition={{ duration: 1, ease: 'easeOut' }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </GlassCard>

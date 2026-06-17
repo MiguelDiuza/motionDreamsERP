@@ -39,14 +39,41 @@ export async function GET() {
 
     // 6. Active Jobs stats
     const jobsResult = await query(`
-      SELECT 
+      SELECT
         COUNT(*) as count,
         COALESCE(SUM(price), 0) as value
-      FROM jobs 
+      FROM jobs
       WHERE status = 'PENDING'
     `);
 
+    // 7. Real scheduled workload for the current week (Bogota), per assignee.
+    const weekLoadResult = await query(`
+      SELECT tm.id, tm.name, tm.role,
+             COUNT(j.id) as jobs,
+             COALESCE(SUM(j.estimated_minutes), 0) as minutes
+      FROM jobs j
+      JOIN team_members tm ON j.assigned_to = tm.id
+      WHERE j.status = 'PENDING'
+        AND j.scheduled_at IS NOT NULL
+        AND (j.scheduled_at AT TIME ZONE 'America/Bogota')::date
+            >= date_trunc('week', (NOW() AT TIME ZONE 'America/Bogota'))::date
+        AND (j.scheduled_at AT TIME ZONE 'America/Bogota')::date
+            < (date_trunc('week', (NOW() AT TIME ZONE 'America/Bogota')) + INTERVAL '7 days')::date
+      GROUP BY tm.id, tm.name, tm.role
+      ORDER BY CASE WHEN tm.role = 'CEO' THEN 0 ELSE 1 END, tm.name
+    `);
+
+    const byMember = weekLoadResult.rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      role: r.role,
+      jobs: parseInt(r.jobs),
+      minutes: parseInt(r.minutes),
+    }));
+    const scheduledMinutesWeek = byMember.reduce((s, m) => s + m.minutes, 0);
+
     const response = {
+      scheduledThisWeek: { totalMinutes: scheduledMinutesWeek, byMember },
       incomeMonth: parseFloat(incomeMonthResult.rows[0].total),
       incomeTotal: parseFloat(incomeTotalResult.rows[0].total),
       expensesMonth: parseFloat(expensesMonthPoints.rows[0].total),
