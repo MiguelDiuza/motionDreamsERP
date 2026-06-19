@@ -24,17 +24,18 @@ export async function GET(request: Request) {
     
     console.log('[GET /api/stats/finances] Fetching finance stats for bounds:', { startParam, endParam });
 
-    // 1. Monthly Income (Payments this month)
+    // 1. Monthly Income (confirmed payments this month)
     const incomeMonthResult = await query(`
-            SELECT COALESCE(SUM(amount), 0) as total 
-            FROM payments 
-            WHERE ${dateConditionIncome}
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM payments
+            WHERE status = 'CONFIRMED' AND ${dateConditionIncome}
         `, incomeParams);
 
-    // 2. All-Time Income
+    // 2. All-Time Income (confirmed)
     const incomeTotalResult = await query(`
-            SELECT COALESCE(SUM(amount), 0) as total 
+            SELECT COALESCE(SUM(amount), 0) as total
             FROM payments
+            WHERE status = 'CONFIRMED'
         `);
 
     // 3. Monthly Business Expenses (Paid this month)

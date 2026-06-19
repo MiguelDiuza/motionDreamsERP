@@ -37,14 +37,23 @@ export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const clientId = searchParams.get('client_id');
+        // Default to confirmed payments only so finance/income views never include
+        // unconfirmed (PENDING) agent payments. Pass ?status=all or ?status=PENDING to override.
+        const status = (searchParams.get('status') || 'CONFIRMED').toUpperCase();
 
         let sql = 'SELECT p.*, COALESCE(c.name, \'Cliente Eliminado\') as client_name FROM payments p LEFT JOIN clients c ON p.client_id = c.id';
-        const params = [];
+        const params: any[] = [];
+        const where: string[] = [];
 
         if (clientId) {
-            sql += ' WHERE p.client_id = $1';
             params.push(clientId);
+            where.push(`p.client_id = $${params.length}`);
         }
+        if (status !== 'ALL') {
+            params.push(status);
+            where.push(`p.status = $${params.length}`);
+        }
+        if (where.length) sql += ' WHERE ' + where.join(' AND ');
 
         sql += ' ORDER BY p.payment_date DESC';
 

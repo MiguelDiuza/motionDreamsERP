@@ -9,17 +9,19 @@ export async function GET(request: Request) {
   if (unauthorized) return unauthorized;
 
   try {
-    // 1. Income this month
+    // 1. Income this month (confirmed)
     const incomeMonthResult = await query(`
-      SELECT COALESCE(SUM(amount), 0) as total 
-      FROM payments 
-      WHERE DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', CURRENT_DATE)
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM payments
+      WHERE status = 'CONFIRMED'
+      AND DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', CURRENT_DATE)
     `);
 
-    // 2. All-time Income
+    // 2. All-time Income (confirmed)
     const incomeTotalResult = await query(`
-      SELECT COALESCE(SUM(amount), 0) as total 
+      SELECT COALESCE(SUM(amount), 0) as total
       FROM payments
+      WHERE status = 'CONFIRMED'
     `);
 
     // 3. Expenses this month
