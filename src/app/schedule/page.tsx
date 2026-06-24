@@ -219,15 +219,20 @@ export default function SchedulePage() {
                                 <div className="grid gap-4">
                                     {groupedByDate[dateKey]
                                         .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
-                                        .map((job: any) => (
+                                        .map((job: any) => {
+                                            const done = job.status === 'COMPLETED' || job.status === 'PAID';
+                                            return (
                                             <div key={job.id} onClick={() => openAssignModal(job)} className="cursor-pointer group">
-                                                <GlassCard className="p-5 border-l-4 border-l-brand-red hover:bg-white/5 transition-all">
+                                                <GlassCard className={`p-5 border-l-4 hover:bg-white/5 transition-all ${done ? 'opacity-50 border-l-green-500' : 'border-l-brand-red'}`}>
                                                     <div className="flex justify-between items-start gap-4">
                                                         <div>
                                                             <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                                <span className="bg-brand-red/20 text-brand-red px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                                                                    <Clock size={12} /> {bogotaTimeLabel(job.scheduled_at)}
+                                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 ${done ? 'bg-green-500/20 text-green-400' : 'bg-brand-red/20 text-brand-red'}`}>
+                                                                    {done ? <CheckCircle2 size={12} /> : <Clock size={12} />} {bogotaTimeLabel(job.scheduled_at)}
                                                                 </span>
+                                                                {done && (
+                                                                    <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">✓ Completado</span>
+                                                                )}
                                                                 <span className="text-white/30 text-[10px] font-bold uppercase tracking-wider">
                                                                     ~ {job.estimated_minutes || 0} min est.
                                                                     {job.actual_minutes ? ` · ${job.actual_minutes} min real` : ''}
@@ -238,7 +243,7 @@ export default function SchedulePage() {
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <h4 className="text-lg font-black text-white uppercase tracking-tight">{job.title}</h4>
+                                                            <h4 className={`text-lg font-black uppercase tracking-tight ${done ? 'text-white/50 line-through' : 'text-white'}`}>{job.title}</h4>
                                                             <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mt-1 flex items-center gap-1.5">
                                                                 <Briefcase size={12} /> {job.client_name}
                                                             </p>
@@ -246,7 +251,8 @@ export default function SchedulePage() {
                                                     </div>
                                                 </GlassCard>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                 </div>
                             </div>
                         ))

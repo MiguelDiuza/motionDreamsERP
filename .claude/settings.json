@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test *)",
+      "Bash(node scripts/test-agent-flow.js)",
+      "Bash(node scripts/test-payments-flow.js)",
+      "Bash(git reset *)",
+      "Bash(git merge *)"
+    ]
+  }
+}
