@@ -1,0 +1,6 @@
+# Machine-specific graphify internals (regenerated locally; contain absolute paths)
+.graphify_python
+.graphify_root
+.graphify_labels.json
+manifest.json
+cache/
