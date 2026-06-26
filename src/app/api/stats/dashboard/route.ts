@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+// Always compute fresh — otherwise Next statically caches this route at build time
+// (the GET takes no request), freezing the dashboard numbers on Vercel.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   try {
     // 1. Income this month (confirmed payments)
@@ -74,8 +79,34 @@ export async function GET() {
     }));
     const scheduledMinutesWeek = byMember.reduce((s, m) => s + m.minutes, 0);
 
+    // 8. Work actually done (completed) today and this week (Bogota), measured by the
+    //    real time each job took (actual_minutes, falling back to estimated_minutes).
+    const workDoneResult = await query(`
+      SELECT
+        COUNT(*) FILTER (WHERE day = today) AS today_jobs,
+        COALESCE(SUM(minutes) FILTER (WHERE day = today), 0) AS today_minutes,
+        COUNT(*) FILTER (WHERE day >= week_start AND day < week_end) AS week_jobs,
+        COALESCE(SUM(minutes) FILTER (WHERE day >= week_start AND day < week_end), 0) AS week_minutes
+      FROM (
+        SELECT
+          (completion_date AT TIME ZONE 'America/Bogota')::date AS day,
+          COALESCE(actual_minutes, estimated_minutes, 0) AS minutes,
+          (NOW() AT TIME ZONE 'America/Bogota')::date AS today,
+          date_trunc('week', (NOW() AT TIME ZONE 'America/Bogota'))::date AS week_start,
+          (date_trunc('week', (NOW() AT TIME ZONE 'America/Bogota')) + INTERVAL '7 days')::date AS week_end
+        FROM jobs
+        WHERE status IN ('COMPLETED', 'PAID') AND completion_date IS NOT NULL
+      ) t
+    `);
+    const wd = workDoneResult.rows[0];
+    const workDone = {
+      today: { jobs: parseInt(wd.today_jobs), minutes: parseInt(wd.today_minutes) },
+      week: { jobs: parseInt(wd.week_jobs), minutes: parseInt(wd.week_minutes) },
+    };
+
     const response = {
       scheduledThisWeek: { totalMinutes: scheduledMinutesWeek, byMember },
+      workDone,
       incomeMonth: parseFloat(incomeMonthResult.rows[0].total),
       incomeTotal: parseFloat(incomeTotalResult.rows[0].total),
       expensesMonth: parseFloat(expensesMonthPoints.rows[0].total),

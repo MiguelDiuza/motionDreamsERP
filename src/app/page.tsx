@@ -41,7 +41,8 @@ export default function Dashboard() {
         clientDebt: 0,
         activeJobsCount: 0,
         activeJobsValue: 0,
-        scheduledThisWeek: { totalMinutes: 0, byMember: [] }
+        scheduledThisWeek: { totalMinutes: 0, byMember: [] },
+        workDone: { today: { jobs: 0, minutes: 0 }, week: { jobs: 0, minutes: 0 } }
     });
     const [clients, setClients] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -208,6 +209,26 @@ export default function Dashboard() {
                     color="text-blue-500"
                     bg="bg-blue-500/10"
                     isMain
+                />
+            </div>
+
+            {/* Trabajo Realizado (Hoy / Semana) — medido por duración real */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <WorkDoneCard
+                    label="Trabajo Realizado Hoy"
+                    minutes={stats.workDone?.today?.minutes || 0}
+                    jobs={stats.workDone?.today?.jobs || 0}
+                    accent="text-brand-red"
+                    bg="from-brand-red/20"
+                    formatHours={formatHours}
+                />
+                <WorkDoneCard
+                    label="Trabajo Realizado (Semana)"
+                    minutes={stats.workDone?.week?.minutes || 0}
+                    jobs={stats.workDone?.week?.jobs || 0}
+                    accent="text-blue-500"
+                    bg="from-blue-500/20"
+                    formatHours={formatHours}
                 />
             </div>
 
@@ -379,6 +400,30 @@ export default function Dashboard() {
                 </div>
             </Modal>
         </div>
+    );
+}
+
+function WorkDoneCard({ label, minutes, jobs, accent, bg, formatHours }: any) {
+    return (
+        <GlassCard className={`p-8 border-none bg-gradient-to-tr ${bg} to-transparent ring-1 ring-white/10`}>
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <div className={`p-3 rounded-2xl bg-white/5 ${accent}`}>
+                        <Clock size={20} />
+                    </div>
+                    <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">{label}</p>
+                </div>
+                <span className="text-[10px] font-black text-white/30 uppercase bg-white/5 px-3 py-1 rounded-full flex items-center gap-1.5">
+                    <Briefcase size={12} /> {jobs} {jobs === 1 ? 'trabajo' : 'trabajos'}
+                </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+                <span className={`text-5xl font-black ${accent} tracking-tighter`}>{formatHours(minutes)}</span>
+            </div>
+            <p className="text-[9px] font-black text-white/20 uppercase mt-3 tracking-wider">
+                Calculado por la duración real de cada trabajo completado
+            </p>
+        </GlassCard>
     );
 }
 
