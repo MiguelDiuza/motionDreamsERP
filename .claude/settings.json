@@ -5,7 +5,8 @@
       "Bash(node scripts/test-agent-flow.js)",
       "Bash(node scripts/test-payments-flow.js)",
       "Bash(git reset *)",
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Read(//c/Users/mandi/.claude/skills/graphify/references/**)"
     ]
   }
 }
